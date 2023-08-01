@@ -1,64 +1,40 @@
-# Wasserstein Weisfeiler-Lehman Graph Kernels
-This repository contains the accompanying code for the NeurIPS 2019 paper
-_Wasserstein Weisfeiler-Lehman Graph Kernels_ available 
-[here](http://papers.nips.cc/paper/8872-wasserstein-weisfeiler-lehman-graph-kernels).
-The repository contains both the package that implements the graph kernels (in `src`)
-and scripts to reproduce some of the results of the paper (in `experiments`).
-
-## Dependencies
-
-WWL relies on the following dependencies:
-
-- `numpy`
-- `scikit-learn`
-- `POT`
-- `cython`
+# WWL Package
 
 ## Installation
-
-The easiest way is to install WWL from the Python Package Index (PyPI) via
-
+To install `wwl`, run the following:
 ```sh
-$ pip install Cython numpy 
+$ pip install cython numpy
 $ pip install wwl
 ```
 
 ## Usage
+WWL can be used to compute the pairwise kernel matrix between a list of Graphs.
+The kernel function `wwl` takes as input a list of igraph `Graph` objects. It can also take their node features (if they are continuously attributed), the number of iterations for the embedding scheme,
+the value for gamma in the Laplacian kernel, and a flag for sinkhorn approximations.
+```python
+from wwl import wwl
 
-The WWL package contains functions to generate a `n x n` kernel matrix between 
-a set of `n` graphs.
+# load the graphs
+graphs = [ig.read(fname) for fname in graph_filenames]
 
-The API also allows the user to directly call the different steps described in the paper, namely:
-- generate the embeddings for the nodes of both discretely labelled and continuously attributed graphs,
-- compute the pairwise distance between a set of graphs
+# load node features for continuous graphs
+node_features = np.load(path_to_node_features)
 
-Please refer to [the src README](https://github.com/BorgwardtLab/WWL/blob/master/src) for detailed documentation.
+# compute the kernel
+kernel_matrix = wwl(graphs, node_features=node_features, num_iterations=4)
 
+# use in SVM
+from sklearn.svm import SVC
 
-## Experiments
+train_index, test_index = np.load(train_index_path), np.load(test_index_path)
+y = np.load(path_to_labels)
+K_train = kernel_matrix[train_index][:,train_index]
+K_test = kernel_matrix[test_index][:,train_index]
 
-You can find some experiments in the [experiments folder](https://github.com/BorgwardtLab/WWL/blob/master/experiments). These will allow you to reproduce results from the paper on 2 datasets.
+svm = SVC(kernel='precomputed') # For a Krein SVM, please refer to krein.py
+svm.fit(K_train)
 
-
-## Contributors
-
-WWL is developed and maintained by members of the [Machine Learning and
-Computational Biology Lab](https://www.bsse.ethz.ch/mlcb):
-
-- Matteo Togninalli ([GitHub](https://github.com/mtog))
-- Elisabetta Ghisu ([Github](https://github.com/eghisu))
-- Bastian Rieck ([GitHub](https://github.com/Pseudomanifold))
-
-## Citation
-Please use the following BibTeX citation when using our method or comparing against it:
+y_predict = svm.predict(K_test)
 ```
-@InCollection{Togninalli19,
-  author    = {Togninalli, Matteo and Ghisu, Elisabetta and Llinares-L{\'o}pez, Felipe and Rieck, Bastian and Borgwardt, Karsten},
-  title     = {Wasserstein Weisfeiler--Lehman Graph Kernels},
-  booktitle = {Advances in Neural Information Processing Systems~32~(NeurIPS)},
-  year      = {2019},
-  editor    = {Wallach, H. and Larochelle, H. and Beygelzimer, A. and d'Alch\'{e}{-}Buc, F. and Fox, E. and Garnett, R.},
-  publisher = {Curran Associates, Inc.},
-  pages     = {6436--6446},
-}
-```
+
+Please see `utilities.wwl_custom_grid_search_cv` for a custom crossvalidation to cross-validate the number of iterations, gammas in the Laplacian kernel, and other parameters for the SVM.  
